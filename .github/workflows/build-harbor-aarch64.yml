@@ -2,8 +2,8 @@ name: Build Harbor Aarch64
 on:
   push:
     branches: [ main ]
-  tags:
-    - 'v*'
+    tags:
+      - 'v*'
 
 jobs:
   build-branches:
@@ -20,7 +20,6 @@ jobs:
           bash build-harbor-aarch64.sh
           docker images
           mkdir -p all-in-one/harbor
-          # goharbor 是新仓库地址，vmware/harbor 归档，高版本会404
           curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/LICENSE -o all-in-one/harbor/LICENSE
           curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/common.sh -o all-in-one/harbor/common.sh
           curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/harbor.yml.tmpl -o all-in-one/harbor/harbor.yml.tmpl
@@ -52,7 +51,6 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04-arm
     env:
-      # 重点修复：从git tag自动获取版本，不再硬编码v2.13.0！
       Harbor_Git_Tag: ${{ github.ref_name }}
     steps:
       - name: Checkout code
@@ -90,7 +88,6 @@ jobs:
           name: harbor-offline-${{ env.Harbor_Git_Tag }}
           path: all-in-one/harbor-offline-installer-aarch64.tgz
 
-      # 可选新增：自动创建GitHub Release并上传离线包
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
