@@ -28,8 +28,11 @@ make pre_update
 # Compile harbor components:
 make compile COMPILETAG=compile_golangimage
 
-# ========== 新增这一行：构建基础镜像 harbor-prepare-base ==========
+# ========== 重点：进入harbor源码目录构建 prepare-base ==========
+cd src/github.com/goharbor/harbor
 make prepare-base
+# 切回harbor-arm目录，继续build
+cd ../../../../
 
 # Build harbor arm image:
 make build GOBUILDTAGS="include_oss include_gcs" BUILDBIN=true TRIVYFLAG=true GEN_TLS=true PULL_BASE_FROM_DOCKERHUB=false
