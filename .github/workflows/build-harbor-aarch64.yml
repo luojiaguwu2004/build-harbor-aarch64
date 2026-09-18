@@ -15,6 +15,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt autoremove -y
+
+      - name: Install dependencies & Docker
+        run: |
+          sudo apt update
+          sudo apt install -y make git curl jq unzip build-essential ca-certificates
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh get-docker.sh
+          sudo usermod -aG docker $USER
+          newgrp docker
+
       - name: Build & Package Harbor (v2.15.2 test build)
         run: |
           bash build-harbor-aarch64.sh
@@ -26,71 +40,11 @@ jobs:
           curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/install.sh -o all-in-one/harbor/install.sh
           curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/prepare -o all-in-one/harbor/prepare
           sed -i "s#goharbor/prepare:dev#goharbor/prepare:${Harbor_Git_Tag}-aarch64#g" all-in-one/harbor/prepare
-          docker save $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^goharbor/"| grep "\-aarch64") | gzip > all-in-one/harbor/harbor.${Harbor_Git_Tag}.tar.gz
-          cd all-in-one
-          chmod +x harbor/prepare harbor/install.sh
-          tar zcf harbor-offline-installer-aarch64.tgz harbor
-          rm -rf harbor
-          docker build -t alanpeng/harbor_images_aarch64:${Harbor_Git_Tag} .
+          docker save $(docker images | grep "goharbor" | grep "-aarch64" | awk '{print $1":"$2}') | gzip > all-in-one/harbor/harbor.${Harbor_Git_Tag}.tar.gz
 
-      - name: Login DockerHub & Push Image
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          docker push alanpeng/harbor_images_aarch64:${Harbor_Git_Tag}
-
-      - name: Upload offline package artifact
+      # 仅上传到 workflow 制品，不会创建 Release，构建完手动下载
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: harbor-offline-${{ env.Harbor_Git_Tag }}
-          path: all-in-one/harbor-offline-installer-aarch64.tgz
-
-  build-tags:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04-arm
-    env:
-      Harbor_Git_Tag: ${{ github.ref_name }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build & Package Harbor (Tag release build)
-        run: |
-          bash build-harbor-aarch64.sh
-          docker images
-          mkdir -p all-in-one/harbor
-          curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/LICENSE -o all-in-one/harbor/LICENSE
-          curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/common.sh -o all-in-one/harbor/common.sh
-          curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/harbor.yml.tmpl -o all-in-one/harbor/harbor.yml.tmpl
-          curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/install.sh -o all-in-one/harbor/install.sh
-          curl -L https://raw.githubusercontent.com/goharbor/harbor/${Harbor_Git_Tag}/make/prepare -o all-in-one/harbor/prepare
-          sed -i "s#goharbor/prepare:dev#goharbor/prepare:${Harbor_Git_Tag}-aarch64#g" all-in-one/harbor/prepare
-          docker save $(docker images --format "{{.Repository}}:{{.Tag}}" | grep "^goharbor/"| grep "\-aarch64") | gzip > all-in-one/harbor/harbor.${Harbor_Git_Tag}.tar.gz
-          cd all-in-one
-          chmod +x harbor/prepare harbor/install.sh
-          tar zcf harbor-offline-installer-aarch64.tgz harbor
-          rm -rf harbor
-          docker build -t alanpeng/harbor_images_aarch64:${Harbor_Git_Tag} .
-
-      - name: Login DockerHub & Push Image
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
-          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          docker push alanpeng/harbor_images_aarch64:${Harbor_Git_Tag}
-
-      - name: Upload offline package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: harbor-offline-${{ env.Harbor_Git_Tag }}
-          path: all-in-one/harbor-offline-installer-aarch64.tgz
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Harbor ${{ env.Harbor_Git_Tag }} aarch64 offline installer
-          files: all-in-one/harbor-offline-installer-aarch64.tgz
-          generate_release_notes: true
+          name: harbor-offline-aarch64-v2.15.2
+          path: all-in-one/harbor/harbor.${{ env.Harbor_Git_Tag }}.tar.gz
